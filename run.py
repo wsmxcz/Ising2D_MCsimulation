@@ -8,10 +8,7 @@ import platform
 from Ising2D import Ising2D
 from MCMC import MCMC
 from analysis import store_results_to_csv
-from plot import plot_ising_results
-
-# Create data directory if it doesn't exist
-os.makedirs("data", exist_ok=True)
+from plot import combine_and_plot_results
 
 def simulate_single_temperature(params):
     """Run Ising model simulation for a single temperature"""
@@ -21,14 +18,19 @@ def simulate_single_temperature(params):
     measurement_sweeps = params['measurement_sweeps'] 
     sample_interval = params['sample_interval']
     
-    warmup_sweeps = base_warmup_sweeps
+    # Temperature-dependent warmup (more steps at low T)
+    if T < 1.0:
+        warmup_factor = min(10.0, 1.0 / T)
+        warmup_sweeps = int(base_warmup_sweeps * warmup_factor)
+    else:
+        warmup_sweeps = base_warmup_sweeps
     
     # Use ordered initialization for low temperatures
     init_random = T >= 0.5
     
     # Initialize model and simulation
-    model = Ising2D(L=L, J=1.0, H=0.0, init_random=init_random)
-    mcmc = MCMC(model, sweeps=warmup_sweeps, temperature=T, method='metropolis')
+    model = Ising2D(L=L, J=1.0, H=0.0, init_random=init_random, use_parallel=False)
+    mcmc = MCMC(model, sweeps=warmup_sweeps, temperature=T, method='metropolis', simultaneous_flip=True)
     
     # Equilibration with early stopping if energy stabilizes
     prev_energy = model.total_energy()
@@ -48,8 +50,8 @@ def simulate_single_temperature(params):
             prev_energy = current_energy
     
     # Measurement phase
-    energies = []
-    magnetizations = []
+    energies_at_T = []
+    mags_at_T = []
     
     for sweep in range(measurement_sweeps):
         mcmc.step()
@@ -57,10 +59,10 @@ def simulate_single_temperature(params):
         if sweep % sample_interval == 0:
             E = model.total_energy()
             M = np.sum(model.spins) / model.N
-            energies.append(E)
-            magnetizations.append(M)
+            energies_at_T.append(E)
+            mags_at_T.append(M)
     
-    return (T, energies, magnetizations)
+    return (T, energies_at_T, mags_at_T)
 
 def run_simulation(max_workers=None, use_process_pool=True):
     """Run parallel Ising model simulations for multiple system sizes and temperatures"""
@@ -115,13 +117,13 @@ def run_simulation(max_workers=None, use_process_pool=True):
             mags_for_L.append(mags_at_T)
         
         # Store results for this system size
-        csv_filename = f"data/ising_results_L{L}.csv"
+        csv_filename = f"ising_results_L{L}.csv"
         store_results_to_csv(temperatures, [energies_for_L], [mags_for_L], [L], output_filename=csv_filename)
         print(f"Completed system size L={L}, results saved to {csv_filename}")
     
     # Generate plots
     print("All system sizes completed. Generating plots...")
-    plot_ising_results()
+    combine_and_plot_results()
 
 if __name__ == "__main__":
     # Set appropriate multiprocessing method for Windows

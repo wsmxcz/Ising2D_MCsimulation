@@ -2,67 +2,37 @@
 
 import numpy as np
 import csv
-import os
+import glob
 
-# Create data directory if it doesn't exist
-os.makedirs("data", exist_ok=True)
-
-def compute_observables(energy_samples, magnetization_samples, temperature, system_size):
-    """Compute thermodynamic observables from simulation data
-    
-    Args:
-        energy_samples: List of energy measurements
-        magnetization_samples: List of magnetization measurements
-        temperature: Simulation temperature
-        system_size: Linear system size L
-    
-    Returns:
-        Dictionary containing calculated observables
-    """
+def compute_averages(energies, magnetizations):
+    """Compute thermodynamic averages from energy and magnetization samples"""
     # Convert to numpy arrays
-    energy_samples = np.array(energy_samples)
-    magnetization_samples = np.array(magnetization_samples)
-    abs_magnetization_samples = np.abs(magnetization_samples)
-    N = system_size * system_size
+    energies = np.array(energies)
+    magnetizations = np.array(magnetizations)
+    abs_magnetizations = np.abs(magnetizations)
     
-    # Calculate basic observables
-    avg_energy = np.mean(energy_samples) / N
-    avg_magnetization = np.mean(magnetization_samples)
-    avg_abs_magnetization = np.mean(abs_magnetization_samples)
+    # Average energy and magnetization
+    avg_energy = np.mean(energies)
+    avg_magnetization = np.mean(magnetizations)
+    avg_abs_magnetization = np.mean(abs_magnetizations)
     
-    # Fluctuations for specific heat and susceptibility
-    energy_squared_avg = np.mean(energy_samples**2)
-    abs_mag_squared_avg = np.mean(abs_magnetization_samples**2)
+    # Specific heat: C = (E^2 - <E>^2) / (N * T^2)
+    energy_sq = np.mean(energies**2)
+    specific_heat = (energy_sq - avg_energy**2) / (len(energies) * (1 / len(energies))**2)
     
-    # Specific heat: C = (⟨E²⟩ - ⟨E⟩²) / (N * T²)
-    specific_heat = (energy_squared_avg - np.mean(energy_samples)**2) / (N * temperature**2)
-    
-    # Susceptibility: χ = (⟨|M|²⟩ - ⟨|M|⟩²) / (N * T)
-    susceptibility = (abs_mag_squared_avg - avg_abs_magnetization**2) / (temperature * N)
+    # Susceptibility using absolute magnetization
+    susceptibility = (np.mean(abs_magnetizations**2) - avg_abs_magnetization**2) / len(magnetizations)
     
     return {
         'avg_energy': avg_energy,
-        'std_energy': np.std(energy_samples) / N,
         'specific_heat': specific_heat,
-        'avg_magnetization': avg_magnetization,
-        'avg_abs_magnetization': avg_abs_magnetization,
-        'std_magnetization': np.std(magnetization_samples),
+        'magnetization': avg_magnetization,
+        'abs_magnetization': avg_abs_magnetization,
         'susceptibility': susceptibility
     }
 
-def store_results_to_csv(temperatures, energy_data, magnetization_data, system_sizes, output_filename="data/ising_results.csv"):
-    """Store simulation results to CSV file
-    
-    Args:
-        temperatures: List of temperatures simulated
-        energy_data: Nested list of energy samples for each temperature and system size
-        magnetization_data: Nested list of magnetization samples for each temperature and system size
-        system_sizes: List of system sizes L
-        output_filename: Path to output CSV file
-    """
-    # Ensure data directory exists
-    os.makedirs(os.path.dirname(output_filename), exist_ok=True)
-    
+def store_results_to_csv(temperatures, all_energies, all_magnetizations, L_values, output_filename="ising_results.csv"):
+    """Store simulation results to CSV file"""
     rows = []
     header = ["L", "T", "avg_energy", "std_energy", "specific_heat", 
              "avg_magnetization", "avg_abs_magnetization", "std_magnetization", "susceptibility"]
@@ -71,30 +41,26 @@ def store_results_to_csv(temperatures, energy_data, magnetization_data, system_s
     rounded_temperatures = np.round(temperatures, 4)
     
     # Calculate observables for each system size and temperature
-    for size_idx, L in enumerate(system_sizes):
-        energies_for_size = energy_data[size_idx]
-        mags_for_size = magnetization_data[size_idx]
+    for L_idx, L in enumerate(L_values):
+        energies_for_L = all_energies[L_idx]
+        mags_for_L = all_magnetizations[L_idx]
+        N = L * L
         
-        for temp_idx, T in enumerate(rounded_temperatures):
-            # Get samples for this temperature and system size
-            energy_samples = energies_for_size[temp_idx]
-            mag_samples = mags_for_size[temp_idx]
+        for i, T in enumerate(rounded_temperatures):
+            e_samples = np.array(energies_for_L[i])
+            m_samples = np.array(mags_for_L[i])
+            abs_m_samples = np.abs(m_samples)
             
-            # Calculate all observables
-            results = compute_observables(energy_samples, mag_samples, T, L)
+            avg_e = np.mean(e_samples)
+            std_e = np.std(e_samples)
+            avg_m = np.mean(m_samples)
+            avg_abs_m = np.mean(abs_m_samples)
+            std_m = np.std(m_samples)
             
-            # Create data row
-            row = [
-                L, 
-                T, 
-                results['avg_energy'], 
-                results['std_energy'],
-                results['specific_heat'], 
-                results['avg_magnetization'], 
-                results['avg_abs_magnetization'], 
-                results['std_magnetization'], 
-                results['susceptibility']
-            ]
+            specific_heat = (np.mean(e_samples**2) - avg_e**2) / (N * T**2)
+            susceptibility = (np.mean(abs_m_samples**2) - avg_abs_m**2) / (T * N)
+            
+            row = [L, T, avg_e, std_e, specific_heat, avg_m, avg_abs_m, std_m, susceptibility]
             rows.append(row)
     
     # Write to CSV file
@@ -104,3 +70,41 @@ def store_results_to_csv(temperatures, energy_data, magnetization_data, system_s
         writer.writerows(rows)
     
     print(f"Results stored in {output_filename}")
+
+def combine_csv_files(pattern="ising_results_L*.csv", output_file="ising_results_combined.csv"):
+    """Combine multiple per-system-size CSV files into a single file"""
+    # Get all matching files
+    files = glob.glob(pattern)
+    
+    if not files:
+        print(f"No files matching pattern '{pattern}' found.")
+        return
+    
+    all_rows = []
+    header = None
+    
+    # Read each file
+    for file in files:
+        with open(file, 'r', newline='') as f:
+            reader = csv.reader(f)
+            file_header = next(reader)
+            
+            if header is None:
+                header = file_header
+            
+            # Add all rows, ensuring temperature is rounded consistently
+            for row in reader:
+                if len(row) > 1:
+                    try:
+                        row[1] = str(round(float(row[1]), 4))
+                    except (ValueError, IndexError):
+                        pass
+                all_rows.append(row)
+    
+    # Write combined file
+    with open(output_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(all_rows)
+    
+    print(f"Combined {len(files)} files into {output_file}")

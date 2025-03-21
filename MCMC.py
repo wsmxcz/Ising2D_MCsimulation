@@ -5,39 +5,42 @@ import math
 
 class MCMC:
     """Monte Carlo simulation for the 2D Ising model using Metropolis algorithm"""
-    def __init__(self, model, sweeps, temperature, method='metropolis'):
+    def __init__(self, model, sweeps, temperature, method='metropolis', simultaneous_flip=False):
         """
-        Initialize Monte Carlo simulation
-        
         Args:
             model: Ising model instance
             sweeps: number of Monte Carlo sweeps
             temperature: system temperature
-            method: 'metropolis' (currently only option supported)
+            method: 'metropolis' or 'heat_bath' (not implented now)
+            simultaneous_flip: whether to use parallel updates
         """
         self.model = model
         self.sweeps = sweeps
         self.beta = 1.0 / temperature
         self.method = method
+        self.simultaneous_flip = simultaneous_flip
 
     def step(self):
-        """Perform one Monte Carlo step (single sweep through the lattice)"""
-        self.single_spin_flip()
+        """Perform one Monte Carlo step"""
+        if self.simultaneous_flip:
+            self.simultaneous_spin_flip()
+        else:
+            self.single_spin_flip()
 
     def single_spin_flip(self):
         """Update spins one at a time using Metropolis algorithm"""
         N = self.model.N
-        
-        # Randomly select N sites to update (one sweep)
         rand_indices = np.random.randint(0, N, size=N)
         
         for idx in rand_indices:
-            # Calculate energy change if we flip this spin
             dE = self.model.delta_energy_if_flip(idx)
-            
-            # Apply Metropolis acceptance criterion
+            # Metropolis acceptance criterion
             if dE < 0 or np.random.rand() < math.exp(-self.beta * dE):
                 self.model.flip_spin(idx)
+
+    def simultaneous_spin_flip(self):
+        """Use model's parallel update method"""
+        self.model.update_spins(self.beta)
 
     def run(self):
         """Run the simulation for the specified number of sweeps"""

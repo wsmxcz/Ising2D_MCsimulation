@@ -1,7 +1,7 @@
 # Ising2D.py - 2D Ising model implementation with Numba acceleration
 
 import numpy as np
-from numba import njit
+from numba import njit, prange
 
 @njit
 def compute_total_energy(spins, neighbors_idx, neighbors_J, H):
@@ -26,22 +26,37 @@ def compute_delta_energy(spins, i, neighbors_idx, neighbors_J, H):
     dE = 2.0 * dE + 2.0 * H * spins[i]
     return dE
 
+@njit
+def update_spins_sequential(spins, neighbors_idx, neighbors_J, H, beta, N):
+    """Update spins sequentially using Metropolis algorithm"""
+    for i in range(N):
+        dE = compute_delta_energy(spins, i, neighbors_idx, neighbors_J, H)
+        if dE < 0 or np.random.rand() < np.exp(-beta * dE):
+            spins[i] *= -1
+    return spins
+
+@njit(parallel=True)
+def update_spins_in_parallel(spins, neighbors_idx, neighbors_J, H, beta, N):
+    """Update spins in parallel using Numba's prange"""
+    # Create a copy of spins to avoid race conditions
+    new_spins = spins.copy()
+    
+    # Use prange for parallel execution
+    for i in prange(N):
+        dE = compute_delta_energy(spins, i, neighbors_idx, neighbors_J, H)
+        if dE < 0 or np.random.rand() < np.exp(-beta * dE):
+            new_spins[i] *= -1
+    
+    return new_spins
+
 class Ising2D:
-    """2D Ising Model implementation with nearest-neighbor interactions"""
-    def __init__(self, L, J=1.0, H=0.0, init_random=True):
-        """
-        Initialize a 2D Ising model
-        
-        Args:
-            L: Linear system size
-            J: Coupling constant (J>0 ferromagnetic)
-            H: External magnetic field
-            init_random: If True, initialize with random spins; otherwise all spins up
-        """
+    """2D Ising Model with pre-cached neighbor indices for performance"""
+    def __init__(self, L, J=1.0, H=0.0, init_random=True, use_parallel=False):
         self.L = L
         self.N = L * L
         self.J = J
         self.H = H
+        self.use_parallel = use_parallel
         
         # Initialize spins (random or ordered)
         if init_random:
@@ -57,7 +72,6 @@ class Ising2D:
         neighbors_idx = np.empty((self.N, 4), dtype=np.int64)
         neighbors_J = np.empty((self.N, 4), dtype=np.float64)
         L = self.L
-        
         for r in range(L):
             for c in range(L):
                 i = r * L + c
@@ -80,3 +94,14 @@ class Ising2D:
     def flip_spin(self, i):
         """Flip spin i"""
         self.spins[i] *= -1
+
+    def update_spins(self, beta):
+        """Update all spins using either parallel or sequential algorithm"""
+        if self.use_parallel:
+            self.spins = update_spins_in_parallel(self.spins, self.neighbors_idx, self.neighbors_J, self.H, beta, self.N)
+        else:
+            self.spins = update_spins_sequential(self.spins, self.neighbors_idx, self.neighbors_J, self.H, beta, self.N)
+            
+    def set_parallel_mode(self, use_parallel):
+        """Set whether to use parallel updates"""
+        self.use_parallel = use_parallel
