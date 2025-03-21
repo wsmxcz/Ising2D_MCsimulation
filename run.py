@@ -18,15 +18,10 @@ def simulate_single_temperature(params):
     measurement_sweeps = params['measurement_sweeps'] 
     sample_interval = params['sample_interval']
     
-    # Temperature-dependent warmup (more steps at low T)
-    if T < 1.0:
-        warmup_factor = min(10.0, 1.0 / T)
-        warmup_sweeps = int(base_warmup_sweeps * warmup_factor)
-    else:
-        warmup_sweeps = base_warmup_sweeps
+    warmup_sweeps = base_warmup_sweeps
     
     # Use ordered initialization for low temperatures
-    init_random = T >= 0.5
+    init_random = T >= 1.0
     
     # Initialize model and simulation
     model = Ising2D(L=L, J=1.0, H=0.0, init_random=init_random, use_parallel=False)
