@@ -44,10 +44,9 @@ def simulate_single_temperature(params):
 
 def run_simulation(max_workers=None, use_process_pool=True):
     """Run parallel Ising model simulations for multiple system sizes and temperatures"""
+    
     # System parameters
     L_values = [10, 20, 30]
-    
-    # Generate temperatures with consistent precision
     T_min, T_max = 0.015, 4.5
     num_temps = 300
     temperatures = np.round(np.linspace(T_min, T_max, num_temps), 4)
@@ -61,7 +60,6 @@ def run_simulation(max_workers=None, use_process_pool=True):
     for L in L_values:
         print(f"Processing system size L={L}")
         
-        # Prepare parameters for parallel execution
         params_list = []
         for T in temperatures:
             params = {
@@ -94,22 +92,18 @@ def run_simulation(max_workers=None, use_process_pool=True):
             energies_for_L.append(energies_at_T)
             mags_for_L.append(mags_at_T)
         
-        # Store results for this system size
         csv_filename = f"ising_results_L{L}.csv"
         store_results_to_csv(temperatures, [energies_for_L], [mags_for_L], [L], output_filename=csv_filename)
         print(f"Completed system size L={L}, results saved to {csv_filename}")
     
-    # Generate plots
     print("All system sizes completed. Generating plots...")
     combine_and_plot_results()
 
 if __name__ == "__main__":
-    # Set appropriate multiprocessing method for Windows
     if platform.system() == 'Windows':
         import multiprocessing
         multiprocessing.set_start_method('spawn', force=True)
     
-    # Determine optimal number of worker processes
     cpu_count = os.cpu_count()
     recommended_workers = max(1, cpu_count - 2) if cpu_count else None
     
