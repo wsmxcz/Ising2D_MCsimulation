@@ -125,7 +125,7 @@ def plot_results(csv_filename="ising_results.csv"):
         plt.tight_layout()
         plt.savefig("figure5_Tc_vs_L.pdf", format="pdf")
         
-        # Create 1/L extrapolation plot (保留拟合)
+        # Create 1/L extrapolation plot
         plt.figure(figsize=(4, 3))
         L_inv = [1/L for L in L_values]
         
