@@ -1,5 +1,3 @@
-# analysis.py - Data analysis tools for the Ising model simulation
-
 import numpy as np
 import csv
 import glob
@@ -51,12 +49,15 @@ def store_results_to_csv(temperatures, all_energies, all_magnetizations, L_value
             m_samples = np.array(mags_for_L[i])
             abs_m_samples = np.abs(m_samples)
             
-            avg_e = np.mean(e_samples)
-            std_e = np.std(e_samples)
-            avg_m = np.mean(m_samples)
-            avg_abs_m = np.mean(abs_m_samples)
-            std_m = np.std(m_samples)
+            # Compute averages using the function
+            averages = compute_averages(e_samples, m_samples)
             
+            # Get the required quantities
+            avg_e = averages['avg_energy']
+            std_e = np.std(e_samples)
+            avg_m = averages['magnetization']
+            avg_abs_m = averages['abs_magnetization']
+            std_m = np.std(m_samples)
             specific_heat = (np.mean(e_samples**2) - avg_e**2) / (N * T**2)
             susceptibility = (np.mean(abs_m_samples**2) - avg_abs_m**2) / (T * N)
             

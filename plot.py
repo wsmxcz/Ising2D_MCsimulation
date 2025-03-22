@@ -1,5 +1,3 @@
-# plot.py - Visualization tools for Ising model simulation results
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
@@ -12,11 +10,11 @@ PLOT_STYLE = {
     'font.family': 'serif',
     'font.serif': ['Times New Roman'],
     'mathtext.fontset': 'stix',
-    'axes.labelsize': 12,
-    'axes.titlesize': 14,
-    'xtick.labelsize': 12,
-    'ytick.labelsize': 12,
-    'legend.fontsize': 12,
+    'axes.labelsize': 10,
+    'axes.titlesize': 12,
+    'xtick.labelsize': 10,
+    'ytick.labelsize': 10,
+    'legend.fontsize': 10,
     'figure.dpi': 600,
     'axes.linewidth': 0.8,
     'grid.linewidth': 0.4
@@ -54,169 +52,67 @@ def combine_and_plot_results(csv_pattern="ising_results_L*.csv", combined_csv="i
     else:
         print(f"No result files found matching pattern {csv_pattern}")
 
+def plot_quantity_vs_temperature(df, L_values, quantity, ylabel, title, filename):
+    """
+    Generalized function to plot a given quantity vs temperature for different L values.
+    """
+    plt.figure(figsize=(4, 3))
+    for idx, L in enumerate(L_values):
+        df_L = df[df["L"] == L]
+        plt.plot(df_L["T"], df_L[quantity], 
+                 label=f"L={L}",
+                 color=COLOR_PALETTE[idx % len(COLOR_PALETTE)],
+                 marker=MARKER_STYLES[idx % len(MARKER_STYLES)],
+                 markersize=2,
+                 linewidth=1)
+    plt.xlabel("Temperature (T)")
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(filename, format="pdf")
+    plt.close()
+
 def plot_results(csv_filename="ising_results.csv"):
     """Generate visualization of simulation results from CSV data"""
     # Read CSV data
     df = pd.read_csv(csv_filename)
     df["T"] = df["T"].astype(float).round(4)
     L_values = sorted(df["L"].unique())
-
-    # --- Figure 1: Average Energy vs Temperature ---
-    plt.figure(figsize=(6, 4))
-    for idx, L in enumerate(L_values):
-        df_L = df[df["L"] == L]
-        plt.plot(df_L["T"], df_L["avg_energy"], 
-                 label=f"L={L}", 
-                 color=COLOR_PALETTE[idx % len(COLOR_PALETTE)],
-                 marker=MARKER_STYLES[idx % len(MARKER_STYLES)],
-                 markersize=4,
-                 linewidth=1)
-    plt.xlabel("Temperature (T)")
-    plt.ylabel("Average Energy <E>")
-    plt.title("Average Energy vs Temperature")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("figure1_energy.pdf", format="pdf")
-    plt.close()
-
-    # --- Figure 2: Average Absolute Magnetization vs Temperature ---
-    plt.figure(figsize=(6, 4))
-    for idx, L in enumerate(L_values):
-        df_L = df[df["L"] == L]
-        plt.plot(df_L["T"], df_L["avg_abs_magnetization"], 
-                 label=f"L={L}",
-                 color=COLOR_PALETTE[idx % len(COLOR_PALETTE)],
-                 marker=MARKER_STYLES[idx % len(MARKER_STYLES)],
-                 markersize=4,
-                 linewidth=1)
-    plt.xlabel("Temperature (T)")
-    plt.ylabel("Average Absolute Magnetization <|M|>")
-    plt.title("Average Absolute Magnetization vs Temperature")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("figure2_magnetization.pdf", format="pdf")
-    plt.close()
-
-    # --- Figure 3: Susceptibility vs Temperature ---
-    plt.figure(figsize=(6, 4))
-    for idx, L in enumerate(L_values):
-        df_L = df[df["L"] == L]
-        plt.plot(df_L["T"], df_L["susceptibility"], 
-                 label=f"L={L}",
-                 color=COLOR_PALETTE[idx % len(COLOR_PALETTE)],
-                 marker=MARKER_STYLES[idx % len(MARKER_STYLES)],
-                 markersize=4,
-                 linewidth=1)
-    plt.xlabel("Temperature (T)")
-    plt.ylabel("Susceptibility (χ)")
-    plt.title("Susceptibility vs Temperature")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("figure3_susceptibility.pdf", format="pdf")
-    plt.close()
-
-    # --- Figure 4: Specific Heat vs Temperature ---
-    plt.figure(figsize=(6, 4))
-    for idx, L in enumerate(L_values):
-        df_L = df[df["L"] == L]
-        plt.plot(df_L["T"], df_L["specific_heat"], 
-                 label=f"L={L}",
-                 color=COLOR_PALETTE[idx % len(COLOR_PALETTE)],
-                 marker=MARKER_STYLES[idx % len(MARKER_STYLES)],
-                 markersize=4,
-                 linewidth=1)
-    plt.xlabel("Temperature (T)")
-    plt.ylabel("Specific Heat (C)")
-    plt.title("Specific Heat vs Temperature")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig("figure4_specific_heat.pdf", format="pdf")
-    plt.close()
+    
+    plot_quantity_vs_temperature(df, L_values, "avg_energy", "Average Energy <E>", "Average Energy vs Temperature", "figure1_energy.pdf")
+    plot_quantity_vs_temperature(df, L_values, "avg_abs_magnetization", "Average Absolute Magnetization <|M|>", "Average Absolute Magnetization vs Temperature", "figure2_magnetization.pdf")
+    plot_quantity_vs_temperature(df, L_values, "susceptibility", "Susceptibility (χ)", "Susceptibility vs Temperature", "figure3_susceptibility.pdf")
+    plot_quantity_vs_temperature(df, L_values, "specific_heat", "Specific Heat (C)", "Specific Heat vs Temperature", "figure4_specific_heat.pdf")
 
     # --- Figure 5: Critical Temperature Analysis ---
     if len(L_values) > 1:
-        # Fit function for finite size scaling
-        def finite_size_scaling(L, Tc_inf, a, nu):
-            return Tc_inf + a * L**(-1/nu)
+        def get_Tc_from_peak(df_L, observable):
+            idx_max = df_L[observable].idxmax()
+            return round(df.loc[idx_max, "T"], 4)
 
         # Collect Tc estimates from peaks
-        Tc_chi_values = []
-        Tc_C_values = []
+        Tc_chi_values = [get_Tc_from_peak(df[df["L"] == L], "susceptibility") for L in L_values]
+        Tc_C_values = [get_Tc_from_peak(df[df["L"] == L], "specific_heat") for L in L_values]
         
-        for L in L_values:
-            df_L = df[df["L"] == L]
-            
-            # Find susceptibility peak
-            idx_max_chi = df_L["susceptibility"].idxmax()
-            Tc_chi = df.loc[idx_max_chi, "T"]
-            Tc_chi_values.append(round(Tc_chi, 4))
-            
-            # Find specific heat peak
-            idx_max_C = df_L["specific_heat"].idxmax()
-            Tc_C = df.loc[idx_max_C, "T"]
-            Tc_C_values.append(round(Tc_C, 4))
-            
-        # Plot Tc vs L
-        plt.figure(figsize=(6, 4))
-        
+        # Plot Tc vs L without fitting
+        plt.figure(figsize=(4, 3))
         plt.plot(L_values, Tc_chi_values,
-                 label="Tc from susceptibility", 
-                 color=COLOR_PALETTE[0],
-                 marker=MARKER_STYLES[0],
-                 markersize=8,
-                 linewidth=1.5,
-                 linestyle='-')
+                label="Tc from susceptibility", 
+                color=COLOR_PALETTE[0],
+                marker=MARKER_STYLES[0],
+                markersize=4,
+                linewidth=1.5,
+                linestyle='-')
         
         plt.plot(L_values, Tc_C_values,
-                 label="Tc from specific heat", 
-                 color=COLOR_PALETTE[1],
-                 marker=MARKER_STYLES[1],
-                 markersize=8,
-                 linewidth=1.5,
-                 linestyle='-')
-        
-        # Perform finite-size scaling fits for both observables
-        try:
-            # Susceptibility fit
-            p0_chi = [2.269, 1.0, 1.0]
-            bounds_chi = ([2.0, 0.1, 0.1], [2.5, 10.0, 2.0])
-            params_chi, _ = optimize.curve_fit(finite_size_scaling, L_values, Tc_chi_values, 
-                                            p0=p0_chi, bounds=bounds_chi, maxfev=10000)
-            Tc_inf_chi, a_chi, nu_chi = params_chi
-            
-            # Specific heat fit
-            p0_C = [2.269, 1.0, 1.0]
-            bounds_C = ([2.0, 0.1, 0.1], [2.5, 10.0, 2.0])
-            params_C, _ = optimize.curve_fit(finite_size_scaling, L_values, Tc_C_values, 
-                                          p0=p0_C, bounds=bounds_C, maxfev=10000)
-            Tc_inf_C, a_C, nu_C = params_C
-            
-            # Generate curves for plotting
-            L_fit = np.linspace(min(L_values), max(L_values)*1.5, 100)
-            Tc_fit_chi = finite_size_scaling(L_fit, Tc_inf_chi, a_chi, nu_chi)
-            Tc_fit_C = finite_size_scaling(L_fit, Tc_inf_C, a_C, nu_C)
-            
-            # Plot susceptibility fit
-            plt.plot(L_fit, Tc_fit_chi,
-                     color=COLOR_PALETTE[0], 
-                     label=f"Susceptibility FSS: $T_c = {Tc_inf_chi:.4f}$",
-                     linestyle='--')
-            
-            # Plot specific heat fit
-            plt.plot(L_fit, Tc_fit_C,
-                     color=COLOR_PALETTE[1], 
-                     label=f"Specific heat FSS: $T_c = {Tc_inf_C:.4f}$",
-                     linestyle='--')
-            
-            # Show the extrapolated values
-            plt.axhline(y=Tc_inf_chi, color=COLOR_PALETTE[0], linestyle=':')
-            plt.axhline(y=Tc_inf_C, color=COLOR_PALETTE[1], linestyle=':')
-        except Exception as e:
-            print(f"Warning: Could not perform finite-size scaling fit: {e}")
+                label="Tc from specific heat", 
+                color=COLOR_PALETTE[1],
+                marker=MARKER_STYLES[1],
+                markersize=4,
+                linewidth=1.5,
+                linestyle='-')
         
         # Add exact Tc line
         plt.axhline(y=2.269, color="black", linestyle="--", label="Exact $T_c = 2.269$")
@@ -229,59 +125,53 @@ def plot_results(csv_filename="ising_results.csv"):
         plt.tight_layout()
         plt.savefig("figure5_Tc_vs_L.pdf", format="pdf")
         
-        # Create 1/L extrapolation plot
-        plt.figure(figsize=(6, 4))
+        # Create 1/L extrapolation plot (保留拟合)
+        plt.figure(figsize=(4, 3))
         L_inv = [1/L for L in L_values]
         
         plt.plot(L_inv, Tc_chi_values,
                 label="Tc from susceptibility", 
                 color=COLOR_PALETTE[0],
                 marker=MARKER_STYLES[0],
-                markersize=8)
+                markersize=4)
         
         plt.plot(L_inv, Tc_C_values,
                 label="Tc from specific heat", 
                 color=COLOR_PALETTE[1],
                 marker=MARKER_STYLES[1],
-                markersize=8)
+                markersize=4)
+        
+        # Linear scaling function for 1/L extrapolation
+        def linear_scaling(L_inv, Tc_inf, b):
+            return Tc_inf + b * L_inv
         
         # Linear fit to 1/L data for both observables
         try:
-            def linear_scaling(L_inv, Tc_inf, b):
-                return Tc_inf + b * L_inv
-            
-            # Susceptibility linear fit
             bounds_lin_chi = ([2.0, 0.0], [2.5, 10.0])
             params_lin_chi, _ = optimize.curve_fit(linear_scaling, L_inv, Tc_chi_values,
                                                 bounds=bounds_lin_chi, maxfev=5000)
             Tc_inf_lin_chi, b_chi = params_lin_chi
             
-            # Specific heat linear fit
             bounds_lin_C = ([2.0, 0.0], [2.5, 10.0])
             params_lin_C, _ = optimize.curve_fit(linear_scaling, L_inv, Tc_C_values,
-                                              bounds=bounds_lin_C, maxfev=5000)
+                                                bounds=bounds_lin_C, maxfev=5000)
             Tc_inf_lin_C, b_C = params_lin_C
             
-            # Generate curves for plotting
             L_inv_fit = np.linspace(0, max(L_inv)*1.2, 100)
             Tc_lin_fit_chi = linear_scaling(L_inv_fit, Tc_inf_lin_chi, b_chi)
             Tc_lin_fit_C = linear_scaling(L_inv_fit, Tc_inf_lin_C, b_C)
             
-            # Plot susceptibility fit
             plt.plot(L_inv_fit, Tc_lin_fit_chi,
-                    color=COLOR_PALETTE[0], 
-                    label=f"Susceptibility: $T_c = {Tc_inf_lin_chi:.4f}$",
-                    linestyle='-')
-            
-            # Plot specific heat fit
+                    color=COLOR_PALETTE[0],
+                    linestyle="--", 
+                    label=f"Susceptibility: $T_c = {Tc_inf_lin_chi:.4f}$")
             plt.plot(L_inv_fit, Tc_lin_fit_C,
-                    color=COLOR_PALETTE[1], 
-                    label=f"Specific heat: $T_c = {Tc_inf_lin_C:.4f}$",
-                    linestyle='-')
+                    color=COLOR_PALETTE[1],
+                    linestyle="--",
+                    label=f"Specific heat: $T_c = {Tc_inf_lin_C:.4f}$")
             
-            # Mark the extrapolated values
-            plt.plot(0, Tc_inf_lin_chi, marker='o', markersize=10, color=COLOR_PALETTE[0])
-            plt.plot(0, Tc_inf_lin_C, marker='s', markersize=10, color=COLOR_PALETTE[1])
+            plt.plot(0, Tc_inf_lin_chi, marker='o', markersize=4, color=COLOR_PALETTE[0])
+            plt.plot(0, Tc_inf_lin_C, marker='s', markersize=4, color=COLOR_PALETTE[1])
         except Exception as e:
             print(f"Warning: Could not perform linear extrapolation fit: {e}")
         

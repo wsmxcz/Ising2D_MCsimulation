@@ -1,5 +1,3 @@
-# run.py - Ising model simulation with parallel temperature processing
-
 import numpy as np
 from tqdm import tqdm
 import concurrent.futures
@@ -14,35 +12,20 @@ def simulate_single_temperature(params):
     """Run Ising model simulation for a single temperature"""
     L = params['L']
     T = params['T']
-    base_warmup_sweeps = params['base_warmup_sweeps']
+    warmup_sweeps = params['warmup_sweeps']
     measurement_sweeps = params['measurement_sweeps'] 
     sample_interval = params['sample_interval']
-    
-    warmup_sweeps = base_warmup_sweeps
     
     # Use ordered initialization for low temperatures
     init_random = T >= 1.0
     
     # Initialize model and simulation
     model = Ising2D(L=L, J=1.0, H=0.0, init_random=init_random, use_parallel=False)
-    mcmc = MCMC(model, sweeps=warmup_sweeps, temperature=T, method='metropolis', simultaneous_flip=True)
-    
-    # Equilibration with early stopping if energy stabilizes
-    prev_energy = model.total_energy()
-    energy_unchanged_count = 0
+    mcmc = MCMC(model, sweeps=warmup_sweeps, temperature=T, method='metropolis_numba')
     
     for step in range(warmup_sweeps):
         mcmc.step()
-        
-        if step % 10000 == 0 and step > 0:
-            current_energy = model.total_energy()
-            if abs(current_energy - prev_energy) < 1e-6:
-                energy_unchanged_count += 1
-                if energy_unchanged_count >= 10:
-                    break
-            else:
-                energy_unchanged_count = 0
-            prev_energy = current_energy
+        prev_energy = model.total_energy()
     
     # Measurement phase
     energies_at_T = []
@@ -70,7 +53,7 @@ def run_simulation(max_workers=None, use_process_pool=True):
     temperatures = np.round(np.linspace(T_min, T_max, num_temps), 4)
     
     # Simulation parameters
-    base_warmup_sweeps = 100_000
+    warmup_sweeps = 100_000
     measurement_sweeps = 300_000
     sample_interval = 10
     
@@ -84,7 +67,7 @@ def run_simulation(max_workers=None, use_process_pool=True):
             params = {
                 'L': L,
                 'T': float(T),
-                'base_warmup_sweeps': base_warmup_sweeps,
+                'warmup_sweeps': warmup_sweeps,
                 'measurement_sweeps': measurement_sweeps,
                 'sample_interval': sample_interval,
             }

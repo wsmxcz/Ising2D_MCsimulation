@@ -10,6 +10,7 @@ This project implements a parallelized 2D Ising model simulation. The code is op
 
 Key features:
 - Parallel temperature processing using Python's concurrent.futures
+- Metropolis algorithm
 - Numba-accelerated core simulation functions
 - Adaptive equilibration for different temperature regimes
 - Finite-size scaling analysis for critical temperature estimation
@@ -66,6 +67,22 @@ This implementation includes several optimizations:
 - Numba-compiled core functions for near-C performance
 - Temperature-dependent equilibration strategy
 - Ordered initialization for low temperatures
+
+## Future Improvements
+
+Several advanced algorithms and techniques could be implemented to improve the efficiency and accuracy of the simulation:
+
+- **Heat Bath Algorithm**: An alternative update scheme where the new spin state is directly sampled from the Boltzmann distribution, providing an acceptance rate of 1, potentially more efficient than the current Metropolis algorithm.
+
+- **Cluster Update Algorithms**: Implementing Wolff or Swendsen-Wang algorithms to flip entire clusters of aligned spins simultaneously, which significantly reduces critical slowing down near phase transitions.
+
+- **Worm Algorithm**: A technique that rewrites the system variables to improve sampling efficiency near critical points, particularly valuable for complex models.
+
+- **Parallel Tempering**: Also known as replica exchange, this method exchanges configurations between simulations at different temperatures to help systems escape local energy minima, especially useful for complex energy landscapes.
+
+- **Coupling from the Past**: An advanced technique for exact sampling from equilibrium distributions in finite time, providing mathematical guarantees on equilibration.
+
+- **GPU Acceleration**: Moving the core simulation code to GPU using CUDA or other frameworks could provide significant performance improvements for larger lattice sizes.
 
 ## License
 
