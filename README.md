@@ -68,6 +68,10 @@ This implementation includes several optimizations:
 - Temperature-dependent equilibration strategy
 - Ordered initialization for low temperatures
 
+## Time Cost
+
+On an 8-core AMD Ryzen 9 6900HX, it takes approximately 10 minutes (with default parameters).
+
 ## Future Improvements
 
 Several advanced algorithms and techniques could be implemented to improve the efficiency and accuracy of the simulation:
